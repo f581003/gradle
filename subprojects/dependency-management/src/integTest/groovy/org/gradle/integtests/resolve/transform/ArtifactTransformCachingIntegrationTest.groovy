@@ -1448,7 +1448,7 @@ allprojects {
 
     Set<TestFile> outputDirs(String from, String to) {
         Set<TestFile> dirs = []
-        def baseDir = cacheDir.file("files-1.1", from).absolutePath + File.separator
+        def baseDir = cacheDir.file(CacheLayout.TRANSFORMS_STORE.getKey(), from).absolutePath + File.separator
         def pattern = Pattern.compile("Transforming " + Pattern.quote(from) + " to " + Pattern.quote(to) + " into (" + Pattern.quote(baseDir) + "\\w+)")
         for (def line : output.readLines()) {
             def matcher = pattern.matcher(line)
