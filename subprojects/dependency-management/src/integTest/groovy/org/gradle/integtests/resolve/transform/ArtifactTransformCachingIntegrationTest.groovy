@@ -1396,7 +1396,8 @@ allprojects {
         """
 
         when:
-        executer.requireOwnGradleUserHomeDir() // needs its own journal
+        executer.requireIsolatedDaemons() // needs to stop daemon
+        requireOwnGradleUserHomeDir() // needs its own journal
         succeeds ":app:resolve"
 
         then:
@@ -1413,6 +1414,7 @@ allprojects {
         journal.assertExists()
 
         when:
+        run '--stop' // ensure daemon does not cache file access times in memory
         def beforeCleanup = MILLISECONDS.toSeconds(System.currentTimeMillis())
         markForCleanup(outputDir1)
         markForCleanup(gcFile)
