@@ -17,6 +17,7 @@
 package org.gradle.api.internal.changedetection.state.mirror
 
 import org.gradle.api.internal.changedetection.state.FileContentSnapshot
+import org.gradle.api.internal.file.TestFiles
 import org.gradle.api.tasks.util.PatternSet
 import org.gradle.internal.hash.TestFileHasher
 import org.gradle.test.fixtures.file.TestNameTestDirectoryProvider
@@ -32,7 +33,7 @@ class MirrorUpdatingDirectoryWalkerTest extends Specification {
     public final TestNameTestDirectoryProvider tmpDir = new TestNameTestDirectoryProvider()
 
     def fileHasher = new TestFileHasher()
-    def walker = new MirrorUpdatingDirectoryWalker(fileHasher)
+    def walker = new MirrorUpdatingDirectoryWalker(fileHasher, TestFiles.fileSystem())
 
     def "basic directory walking works"() {
         given:
@@ -64,7 +65,6 @@ class MirrorUpdatingDirectoryWalkerTest extends Specification {
 
         then:
         visited.contains(rootTextFile.absolutePath)
-        visited.contains(rootTextFile.absolutePath)
         visited.contains(nestedTextFile.absolutePath)
         visited.contains(nestedSiblingTextFile.absolutePath)
         visited.contains(notTextFile.absolutePath)
@@ -76,6 +76,51 @@ class MirrorUpdatingDirectoryWalkerTest extends Specification {
             'a/b', 'a/b/c.txt',
             'a/c', 'a/c/c.txt', 'a/b/c.html',
             'subdir1', 'subdir1/a', 'subdir1/a/b', 'subdir1/a/b/c.html',
+            'a.txt'
+        ] as Set
+    }
+
+    def "filtering works"() {
+        given:
+        def rootDir = tmpDir.createDir("root")
+        def rootTextFile = rootDir.file("a.txt").createFile()
+        def nestedTextFile = rootDir.file("a/b/c.txt").createFile()
+        def nestedSiblingTextFile = rootDir.file("a/c/c.txt").createFile()
+        def notTextFile = rootDir.file("a/b/c.html").createFile()
+        def excludedFile = rootDir.file("subdir1/a/b/c.html").createFile()
+        def notUnderRoot = tmpDir.createDir("root2").file("a.txt").createFile()
+        def doesNotExist = rootDir.file("b.txt")
+
+        def patterns = new PatternSet()
+        patterns.include("**/*.txt")
+        patterns.exclude("subdir1/**")
+
+        def visited = []
+        def relativePaths = []
+
+        when:
+        def root = walker.walkDir(rootDir.toPath(), patterns)
+        root.visitTree(new PhysicalFileVisitor() {
+            @Override
+            void visit(Path path, String name, Iterable<String> relativePath, FileContentSnapshot content) {
+                visited << path.toString()
+                relativePaths << relativePath.join("/")
+            }
+        }, new ArrayDeque<String>())
+
+        then:
+        visited.contains(rootTextFile.absolutePath)
+        visited.contains(nestedTextFile.absolutePath)
+        visited.contains(nestedSiblingTextFile.absolutePath)
+        !visited.contains(notTextFile.absolutePath)
+        !visited.contains(excludedFile.absolutePath)
+        !visited.contains(notUnderRoot.absolutePath)
+        !visited.contains(doesNotExist.absolutePath)
+        relativePaths as Set == [
+            'a',
+            'a/b', 'a/b/c.txt',
+            'a/c', 'a/c/c.txt',
+            'subdir1', 'subdir1/a', 'subdir1/a/b',
             'a.txt'
         ] as Set
     }
